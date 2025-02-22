@@ -37,6 +37,13 @@ function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ตรวจสอบว่าทุกช่องมีข้อมูลครบหรือไม่
+    if (!firstName || !lastName || !accountNumber || !amount || !createdBy) {
+      alert('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+      return;
+    }
+
     setLoading(true);
 
     try {
