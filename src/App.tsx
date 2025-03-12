@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, UserPlus, Loader2, Save } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import { supabase } from './lib/supabase';
@@ -25,6 +25,31 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const [amount, setAmount] = useState<number | string>('');
+
+  useEffect(() => {
+    const pingSupabase = async () => {
+      try {
+        // อ่านค่าจาก Local Storage ว่าวันสุดท้ายที่ ping คือวันไหน
+        const lastPingDate = localStorage.getItem('lastPingDate');
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        if (lastPingDate !== today) {
+          await supabase.from('customers').select('id').limit(1); // Query ให้ Supabase ไม่โดน Pause
+          localStorage.setItem('lastPingDate', today); // บันทึกวันที่ที่ ping ล่าสุด
+          console.log('Supabase pinged to keep project active.');
+        }
+      } catch (error) {
+        console.error('Error pinging Supabase:', error);
+      }
+    };
+
+    pingSupabase(); // เรียกเมื่อ Component โหลดครั้งแรก
+
+    // ตั้งค่าให้ ping ใหม่ทุก 24 ชั่วโมง
+    const interval = setInterval(pingSupabase, 24 * 60 * 60 * 1000);
+
+    return () => clearInterval(interval); // เคลียร์เมื่อ component ถูก unmount
+  }, []);
 
   const resetForm = () => {
     setFirstName('');
