@@ -299,45 +299,33 @@ function App() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           จำนวนเงิน
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           หมายเหตุ
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           จัดการ
                         </th>
                       </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {searchResults.map((customer) => (
-                        <tr key={customer.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {customer.first_name} {customer.last_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {customer.account_number}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {customer.amount}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {customer.created_by}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              onClick={() => handleDelete(customer.id)}
-                              disabled={deleting === customer.id}
-                              className="text-red-600 hover:text-red-900 focus:outline-none"
-                            >
-                              {deleting === customer.id ? (
-                                <Loader2 className="animate-spin" size={20} />
-                              ) : (
-                                <Trash2 size={20} />
-                              )}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
+                      </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {searchResults.map((customer) => (
+                      <tr key={customer.id} className="text-sm">
+                        <td className="px-6 py-3 whitespace-nowrap">{customer.first_name} {customer.last_name}</td>
+                        <td className="px-6 py-3 whitespace-nowrap text-center">{customer.account_number}</td>
+                        <td className="px-6 py-3 whitespace-nowrap text-center">{customer.amount}</td>
+                        <td className="px-8 py-3 whitespace-normal max-w-xs">{customer.created_by}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                          <button
+                            onClick={() => handleDelete(customer.id)}
+                            disabled={deleting === customer.id}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            {deleting === customer.id ? <Loader2 className="animate-spin" size={20} /> : <Trash2 size={20} />}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                   </table>
                 </div>
               )}
