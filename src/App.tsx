@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, UserPlus, Loader2, Save } from 'lucide-react';
+import { Search, UserPlus, Loader2, Save, Trash2, List } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import { supabase } from './lib/supabase';
 
@@ -19,23 +19,22 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  // const [phoneNumber, setPhoneNumber] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [createdBy, setCreatedBy] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const [amount, setAmount] = useState<number | string>('');
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     const pingSupabase = async () => {
       try {
-        // อ่านค่าจาก Local Storage ว่าวันสุดท้ายที่ ping คือวันไหน
         const lastPingDate = localStorage.getItem('lastPingDate');
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const today = new Date().toISOString().split('T')[0];
 
         if (lastPingDate !== today) {
-          await supabase.from('customers').select('id').limit(1); // Query ให้ Supabase ไม่โดน Pause
-          localStorage.setItem('lastPingDate', today); // บันทึกวันที่ที่ ping ล่าสุด
+          await supabase.from('customers').select('id').limit(1);
+          localStorage.setItem('lastPingDate', today);
           console.log('Supabase pinged to keep project active.');
         }
       } catch (error) {
@@ -43,18 +42,14 @@ function App() {
       }
     };
 
-    pingSupabase(); // เรียกเมื่อ Component โหลดครั้งแรก
-
-    // ตั้งค่าให้ ping ใหม่ทุก 24 ชั่วโมง
+    pingSupabase();
     const interval = setInterval(pingSupabase, 24 * 60 * 60 * 1000);
-
-    return () => clearInterval(interval); // เคลียร์เมื่อ component ถูก unmount
+    return () => clearInterval(interval);
   }, []);
 
   const resetForm = () => {
     setFirstName('');
     setLastName('');
-    // setPhoneNumber('');
     setAccountNumber('');
     setCreatedBy('');
     setAmount('');
@@ -63,9 +58,8 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ตรวจสอบว่าทุกช่องมีข้อมูลครบหรือไม่
     if (!firstName || !lastName || !accountNumber || !amount || !createdBy) {
-      alert('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+      toast.error('กรุณากรอกข้อมูลให้ครบทุกช่อง');
       return;
     }
 
@@ -76,7 +70,6 @@ function App() {
         {
           first_name: firstName,
           last_name: lastName,
-          // phone_number: phoneNumber,
           account_number: accountNumber,
           created_by: createdBy,
           amount: amount,
@@ -96,15 +89,17 @@ function App() {
   };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() && mode === 'search') return;
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,account_number.ilike.%${searchQuery}%`)
-        .limit(10);
+      let query = supabase.from('customers').select('*');
+      
+      if (searchQuery.trim()) {
+        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,account_number.ilike.%${searchQuery}%`);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -120,13 +115,34 @@ function App() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('คุณต้องการลบข้อมูลนี้ใช่หรือไม่?')) return;
+
+    setDeleting(id);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('ลบข้อมูลสำเร็จ');
+      setSearchResults(prev => prev.filter(customer => customer.id !== id));
+    } catch (error) {
+      toast.error('เกิดข้อผิดพลาดในการลบข้อมูล');
+      console.error('Error:', error);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">แจ้งข้อมูลมิจฉาชีพ</h1>
           
-          {/* Mode Selection */}
           <div className="flex gap-4 mb-6">
             <button
               onClick={() => setMode('add')}
@@ -140,7 +156,10 @@ function App() {
               เพิ่มข้อมูลมิจฉาชีพ
             </button>
             <button
-              onClick={() => setMode('search')}
+              onClick={() => {
+                setMode('search');
+                handleSearch();
+              }}
               className={`flex items-center gap-2 px-4 py-2 rounded-md ${
                 mode === 'search'
                   ? 'bg-blue-800 text-white'
@@ -155,17 +174,17 @@ function App() {
           {mode === 'add' ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700"></label>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="ชื่อจริง"
-                  required
-                  className="mt-1 block w-full h-8 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700"></label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="ชื่อจริง"
+                    required
+                    className="mt-1 block w-full h-8 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700"></label>
                   <input
@@ -186,7 +205,7 @@ function App() {
                   onChange={(e) => setAccountNumber(e.target.value)}
                   placeholder="พร้อมเพย์ / ธนาคาร / ทรูวอลเล็ต"
                   required
-                  className="mt-1 block w-full h-8 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200 "
+                  className="mt-1 block w-full h-8 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200"
                 />
               </div>
               <div>
@@ -254,6 +273,16 @@ function App() {
                   )}
                   ค้นหา
                 </button>
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    handleSearch();
+                  }}
+                  className="flex items-center gap-2 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                >
+                  <List size={20} />
+                  ดูทั้งหมด
+                </button>
               </div>
 
               {searchResults.length > 0 && (
@@ -273,6 +302,9 @@ function App() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           หมายเหตุ
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          จัดการ
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -284,11 +316,24 @@ function App() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             {customer.account_number}
                           </td>
-                          <td className='px-6 py-4 whitespace-nowrap'>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             {customer.amount}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {customer.created_by}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => handleDelete(customer.id)}
+                              disabled={deleting === customer.id}
+                              className="text-red-600 hover:text-red-900 focus:outline-none"
+                            >
+                              {deleting === customer.id ? (
+                                <Loader2 className="animate-spin" size={20} />
+                              ) : (
+                                <Trash2 size={20} />
+                              )}
+                            </button>
                           </td>
                         </tr>
                       ))}
