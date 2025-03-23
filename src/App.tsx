@@ -103,7 +103,7 @@ function App() {
       let query = supabase.from('customers').select('*');
       
       if (searchQuery.trim()) {
-        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,account_number.ilike.%${searchQuery}%`);
+        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,account_number.ilike.%${searchQuery}%,created_by.ilike.%${searchQuery}%`);
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -330,7 +330,7 @@ function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="ค้นหาด้วยชื่อ, เบอร์โทร, หรือเลขบัญชี..."
+                  placeholder="ค้นหาด้วยชื่อ, เบอร์โทร, เลขบัญชี หรือหมายเหตุ..."
                   className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200"
                 />
                 <button
