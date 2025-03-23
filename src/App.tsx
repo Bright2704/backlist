@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, UserPlus, Loader2, Save, Trash2, List } from 'lucide-react';
+import { Search, UserPlus, Loader2, Save, Trash2, List, Pencil } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import { supabase } from './lib/supabase';
 
@@ -14,6 +14,11 @@ type Customer = {
   amount: number;
 };
 
+type EditingField = {
+  id: string;
+  field: keyof Customer;
+};
+
 function App() {
   const [mode, setMode] = useState<Mode>('add');
   const [loading, setLoading] = useState(false);
@@ -25,6 +30,8 @@ function App() {
   const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const [amount, setAmount] = useState<number | string>('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editing, setEditing] = useState<EditingField | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   useEffect(() => {
     const pingSupabase = async () => {
@@ -137,11 +144,76 @@ function App() {
     }
   };
 
+  const handleEdit = async (id: string, field: keyof Customer) => {
+    if (editing?.id === id && editing?.field === field) {
+      try {
+        const { error } = await supabase
+          .from('customers')
+          .update({ [field]: editValue })
+          .eq('id', id);
+
+        if (error) throw error;
+
+        setSearchResults(prev =>
+          prev.map(customer =>
+            customer.id === id ? { ...customer, [field]: editValue } : customer
+          )
+        );
+        toast.success('แก้ไขข้อมูลสำเร็จ');
+        setEditing(null);
+        setEditValue('');
+      } catch (error) {
+        toast.error('เกิดข้อผิดพลาดในการแก้ไขข้อมูล');
+        console.error('Error:', error);
+      }
+    } else {
+      const customer = searchResults.find(c => c.id === id);
+      if (customer) {
+        setEditValue(String(customer[field]));
+        setEditing({ id, field });
+      }
+    }
+  };
+
+  const renderEditableCell = (customer: Customer, field: keyof Customer) => {
+    const isEditing = editing?.id === customer.id && editing?.field === field;
+    return (
+      <div className="flex items-center gap-2 group">
+        {isEditing ? (
+          <div className="flex items-center gap-2">
+            <input
+              type={field === 'amount' ? 'number' : 'text'}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={() => handleEdit(customer.id, field)}
+              className="text-green-600 hover:text-green-900"
+            >
+              <Save size={16} />
+            </button>
+          </div>
+        ) : (
+          <>
+            <span>{customer[field]}</span>
+            <button
+              onClick={() => handleEdit(customer.id, field)}
+              className="opacity-0 group-hover:opacity-100 text-blue-600 hover:text-blue-900 transition-opacity"
+            >
+              <Pencil size={16} />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">แจ้งข้อมูลมิจฉาชีพ</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-6">แจ้งข้อมูล</h1>
           
           <div className="flex gap-4 mb-6">
             <button
@@ -153,7 +225,7 @@ function App() {
               }`}
             >
               <UserPlus size={20} />
-              เพิ่มข้อมูลมิจฉาชีพ
+              เพิ่มข้อมูล
             </button>
             <button
               onClick={() => {
@@ -167,7 +239,7 @@ function App() {
               }`}
             >
               <Search size={20} />
-              ค้นหาข้อมูลมิจฉาชีพ
+              ค้นหาข้อมูล
             </button>
           </div>
 
@@ -199,6 +271,16 @@ function App() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700"></label>
+                <textarea
+                  value={createdBy}
+                  onChange={(e) => setCreatedBy(e.target.value)}
+                  placeholder="หมายเหตุ"
+                  rows={3}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700"></label>
                 <input
                   type="text"
                   value={accountNumber}
@@ -216,16 +298,6 @@ function App() {
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="จำนวนเงิน"
                   required
-                  className="mt-1 block w-full h-8 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700"></label>
-                <textarea
-                  value={createdBy}
-                  onChange={(e) => setCreatedBy(e.target.value)}
-                  placeholder="หมายเหตุ"
-                  rows={3}
                   className="mt-1 block w-full h-8 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition duration-200"
                 />
               </div>
@@ -294,38 +366,53 @@ function App() {
                           ชื่อ-นามสกุล
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          หมายเหตุ
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           ช่องทางการชำระเงิน
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           จำนวนเงิน
                         </th>
-                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          หมายเหตุ
-                        </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           จัดการ
                         </th>
                       </tr>
-                      </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {searchResults.map((customer) => (
-                      <tr key={customer.id} className="text-sm">
-                        <td className="px-6 py-3 whitespace-nowrap">{customer.first_name} {customer.last_name}</td>
-                        <td className="px-6 py-3 whitespace-nowrap text-center">{customer.account_number}</td>
-                        <td className="px-6 py-3 whitespace-nowrap text-center">{customer.amount}</td>
-                        <td className="px-8 py-3 whitespace-normal max-w-xs">{customer.created_by}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-center">
-                          <button
-                            onClick={() => handleDelete(customer.id)}
-                            disabled={deleting === customer.id}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            {deleting === customer.id ? <Loader2 className="animate-spin" size={20} /> : <Trash2 size={20} />}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {searchResults.map((customer) => (
+                        <tr key={customer.id} className="text-sm">
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="flex gap-2">
+                              {renderEditableCell(customer, 'first_name')}
+                              {renderEditableCell(customer, 'last_name')}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-normal max-w-xs">
+                            {renderEditableCell(customer, 'created_by')}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
+                            {renderEditableCell(customer, 'account_number')}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
+                            {renderEditableCell(customer, 'amount')}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                            <button
+                              onClick={() => handleDelete(customer.id)}
+                              disabled={deleting === customer.id}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              {deleting === customer.id ? (
+                                <Loader2 className="animate-spin" size={20} />
+                              ) : (
+                                <Trash2 size={20} />
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
                   </table>
                 </div>
               )}
